@@ -63,8 +63,8 @@ int main(int argc, char **argv) {
 
         std::shared_ptr<MNN::CV::ImageProcess> pretreat(
         MNN::CV::ImageProcess::create(MNN::CV::RGB, MNN::CV::RGB, mean_vals, 3, norm_vals, 3));
-        pretreat->convert(frameL.data, 640, 400, frameL.step[0], input_tensorL);
-        pretreat->convert(frameR.data, 640, 400, frameR.step[0], input_tensorR);
+        pretreat->convert(imageL.data, 640, 400, imageL.step[0], input_tensorL);
+        pretreat->convert(imageR.data, 640, 400, imageR.step[0], input_tensorR);
 
         my_interpreter->runSession(my_session);
 
