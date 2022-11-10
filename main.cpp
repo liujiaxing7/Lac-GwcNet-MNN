@@ -26,14 +26,16 @@ int main(int argc, char **argv) {
     MNN::BackendConfig backendConfig;
     backendConfig.precision = (MNN::BackendConfig::PrecisionMode) 2;
     config.backendConfig = &backendConfig;
-    int forward = MNN_FORWARD_CPU;
-    config.type = static_cast<MNNForwardType>(forward);
+//    int forward = MNN_FORWARD_CPU;
+//    config.type = static_cast<MNNForwardType>(forward);
 
     // create session
     MNN::Session *my_session = my_interpreter->createSession(config);
 
     MNN::Tensor *input_tensorL = my_interpreter->getSessionInput(my_session, "L");
+    my_interpreter->resizeTensor(input_tensorL, {1, 3, 400, 640});
     MNN::Tensor *input_tensorR = my_interpreter->getSessionInput(my_session, "R");
+    my_interpreter->resizeTensor(input_tensorR, {1, 3, 400, 640});
 //    my_interpreter->resizeTensor(input_tensor, {1, 3, 416, 416});
 
     std::string imagespath = argv[2];
@@ -52,18 +54,23 @@ int main(int argc, char **argv) {
         cv::Mat imginR = cv::imread(imgR);
         cv::Mat frameL = cv::Mat(imginL.rows, imginL.cols, CV_8UC3, imginL.data);
         cv::Mat frameR = cv::Mat(imginR.rows, imginR.cols, CV_8UC3, imginR.data);
+        cv::Mat imageL, imageR;
+        cv::resize(frameL, imageL, cv::Size(640, 400), cv::INTER_LINEAR);
+        cv::resize(frameR, imageR, cv::Size(640, 400), cv::INTER_LINEAR);
 
         const float mean_vals[3] = {0.485, 0.456, 0.406};
         const float norm_vals[3] = {0.229, 0.224, 0.225};
 
         std::shared_ptr<MNN::CV::ImageProcess> pretreat(
         MNN::CV::ImageProcess::create(MNN::CV::RGB, MNN::CV::RGB, mean_vals, 3, norm_vals, 3));
-        pretreat->convert(frameL.data, 400, 640, frameL.step[0], input_tensorL);
-        pretreat->convert(frameR.data, 400, 640, frameL.step[0], input_tensorR);
+        pretreat->convert(frameL.data, 640, 400, frameL.step[0], input_tensorL);
+        pretreat->convert(frameR.data, 640, 400, frameR.step[0], input_tensorR);
 
         my_interpreter->runSession(my_session);
 
         auto output = my_interpreter->getSessionOutput(my_session, "output");
+        auto t_host = new MNN::Tensor(output, MNN::Tensor::CAFFE);
+        output->copyToHostTensor(t_host);
         std::cout<<"output:"<<output<<std::endl;
     }
 

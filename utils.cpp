@@ -18,7 +18,7 @@ bool isContain(std::string str1, std::string str2)
 void ReadImages(const std::string imagesPath, std::vector<std::string> &lImg, std::vector<std::string> &rImg)
 {
     std::vector<cv::String> allFiles;
-    cv::glob(imagesPath, allFiles, false);
+    cv::glob(imagesPath, allFiles, true);
 
     if (allFiles.size() == 0)
     {
@@ -26,11 +26,11 @@ void ReadImages(const std::string imagesPath, std::vector<std::string> &lImg, st
     }
     for (int i =0 ; i < allFiles.size(); ++i)
     {
-        if (isContain(allFiles[i],"L"))
+        if (isContain(allFiles[i],"L.jpg"))
         {
             lImg.push_back(allFiles[i]);
         }
-        else if (isContain(allFiles[i], "R"))
+        else if (isContain(allFiles[i], "R.jpg"))
         {
             rImg.push_back(allFiles[i]);
         }
