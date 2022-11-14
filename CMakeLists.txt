@@ -7,6 +7,7 @@ set(CMAKE_CXX_STANDARD 14)
 set(MNN_DIR /home/ljx/Downloads/MNN/MNN-2.2.0)
 include_directories(${MNN_DIR}/include)
 include_directories(${MNN_DIR}/include/MNN)
+include_directories(${MNN_DIR}/3rd_party/imageHelper/)
 
 #opencv
 find_package(OpenCV REQUIRED)
