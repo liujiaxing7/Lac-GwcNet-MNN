@@ -18,7 +18,7 @@
 #include "stb_image.h"
 
 int main(int argc, char **argv) {
-//    std::cout << "Hello, World!" << std::endl;
+
     if (argc < 3) {
         std::cout << "modelpath: mnnpath:\n"
                   << "data_path: images.txt\n"
@@ -28,22 +28,28 @@ int main(int argc, char **argv) {
 
     const std::string mnn_path = argv[1];
 
-
-//    MNN::ScheduleConfig sConfig;
-//    sConfig.type = MNN_FORWARD_AUTO;
     const std::vector<std::string> input_names{"L", "R"};
     const std::vector<std::string> output_names{"output"};
-    MNN::Express::Module::Config mdconfig; // default module config
-//    mdconfig.backend = (MNN::Express::Module::BackendInfo *) MNN_FORWARD_OPENCL;
 
+//    auto type = MNN_FORWARD_OPENCL;
+//    MNN::ScheduleConfig Sconfig;
+//    Sconfig.type      = type;
+//    Sconfig.numThread = 4;
+//    Sconfig.backupType = type;
+//    MNN::BackendConfig backendConfig;
+//    int precision = MNN::BackendConfig::Precision_Normal;
+//    backendConfig.precision = static_cast<MNN::BackendConfig::PrecisionMode>(precision);
+//    Sconfig.backendConfig     = &backendConfig;
 
-//    std::unique_ptr<MNN::Express::Module> module; // module
-//    module.reset(MNN::Express::Module::load(input_names, output_names, mnn_path.c_str(), &mdconfig));
+    MNN::Express::Module::Config mConfig;
+//    std::shared_ptr<MNN::Express::Executor::RuntimeManager> rtmgr(MNN::Express::Executor::RuntimeManager::createRuntimeManager(Sconfig));
+//    std::shared_ptr<MNN::Express::Module> net(
+//            MNN::Express::Module::load(input_names, output_names, mnn_path.c_str(),rtmgr,  &mConfig));
+    std::unique_ptr<MNN::Express::Module> module;
+    module.reset(MNN::Express::Module::load(input_names, output_names, mnn_path.c_str(), &mConfig));
 
-    // Give cache full path which must be Readable and writable
+    auto info = module->getInfo();
 
-    std::shared_ptr<MNN::Express::Module> net(
-            MNN::Express::Module::load(input_names, output_names, mnn_path.c_str(), &mdconfig));
 
     std::string imagespath = argv[2];
 
@@ -56,18 +62,22 @@ int main(int argc, char **argv) {
 
     for (size_t i = 0; i < limg.size(); ++i) {
 
-        auto inputLeft = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NCHW);
-        auto inputRight = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NCHW);
-//        auto other = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NCHW);
+//        std::vector<MNN::Express::VARP> inputs(2);
+//        inputs[0] =  MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NC4HW4);
+//        inputs[1] =  MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NC4HW4);
+        auto inputLeft = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NCHW, halide_type_of<float>());
+        auto inputRight = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NCHW, halide_type_of<float>());
+        //auto other = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NC4HW4);
 
         auto imgL = limg.at(i);
         auto imgR = rimg.at(i);
         int w = 640;
         int h = 400;
         int c = 3;
-        auto imageL = stbi_load(imgL.c_str(), &w, &h, &c, 3);
-        auto imageR = stbi_load(imgR.c_str(), &w, &h, &c, 3);
+        auto imageL = stbi_load(imgL.c_str(), &w, &h, &c, 4);
+        auto imageR = stbi_load(imgR.c_str(), &w, &h, &c, 4);
 
+        //std::cout<<imageR<<std::endl;
 //        cv::Mat gray1_mat(400, 640, CV_8UC3, imageR);
 //        imshow("去雾图像显示", gray1_mat);
 //        cv::waitKey();
@@ -77,38 +87,29 @@ int main(int argc, char **argv) {
 //
         MNN::CV::ImageProcess::Config config;
         config.filterType = MNN::CV::BILINEAR;
-        MNN::CV::Matrix trans;
 
         float mean[3] = {103.94f, 116.78f, 123.68f};
         float normals[3] = {0.017f, 0.017f, 0.017f};
-//
+
         ::memcpy(config.mean, mean, sizeof(mean));
         ::memcpy(config.normal, normals, sizeof(mean));
-//
-//
+
         std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(config));
-        pretreat->setMatrix(trans);
 
-        pretreat->convert((uint8_t *) imageL, 640, 400, 0, inputLeft->writeMap<float>() + 1 * 3 * 400 * 640, 640, 400,
-                          3, 0, halide_type_of<float>());
-        pretreat->convert((uint8_t *) imageR, 640, 400, 0, inputRight->writeMap<float>() + 1 * 3 * 400 * 640, 640, 400,
-                          3, 0, halide_type_of<float>());
 
-        stbi_image_free(imageL);
-        stbi_image_free(imageR);
+        pretreat->convert((uint8_t *) imageL, 640, 400, 0, inputLeft->writeMap<float>(), 640, 400,
+                          4, 0, halide_type_of<float>());
+
+//        pretreat->convert((uint8_t *) imageR, 640, 400, 0, inputRight->writeMap<float>() + 1 * 4 * 400 * 640 , 640, 400,
+//                         4, 0, halide_type_of<float>());
+
         std::cout << "forward" << std::endl;
-        try {
-            auto outputs = net->onForward({inputLeft, inputRight});
-        }
-        catch(char *str){
 
-        }
-
+        MNN::Express::Executor::getGlobalExecutor()->resetProfile();
+        auto outputs = module->onForward({inputLeft, inputLeft});
+        MNN::Express::Executor::getGlobalExecutor()->dumpProfile();
         std::cout << "success" << std::endl;
-//        std::vector<MNN::Express::VARP> outputs  = module->onForward(inputs);
-//        auto output_ptr = outputs[0]->readMap<float>();
+
     }
-
-
     return 0;
 }
