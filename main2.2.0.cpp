@@ -62,20 +62,23 @@ int main(int argc, char **argv) {
 
     for (size_t i = 0; i < limg.size(); ++i) {
 
+        int w = 320;
+        int h = 320;
+        int c = 3;
 //        std::vector<MNN::Express::VARP> inputs(2);
 //        inputs[0] =  MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NC4HW4);
 //        inputs[1] =  MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NC4HW4);
-        auto inputLeft = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NCHW, halide_type_of<float>());
-        auto inputRight = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NCHW, halide_type_of<float>());
+        auto inputLeft = MNN::Express::_Input({1, 3, h, w}, MNN::Express::NC4HW4, halide_type_of<float>());
+//        auto inputRight = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NC4HW4, halide_type_of<float>());
         //auto other = MNN::Express::_Input({1, 3, 400, 640}, MNN::Express::NC4HW4);
 
         auto imgL = limg.at(i);
         auto imgR = rimg.at(i);
-        int w = 640;
-        int h = 400;
-        int c = 3;
-        auto imageL = stbi_load(imgL.c_str(), &w, &h, &c, 4);
-        auto imageR = stbi_load(imgR.c_str(), &w, &h, &c, 4);
+
+
+        int width, height, channel;
+        auto imageL = stbi_load(imgL.c_str(), &width, &height, &channel, 4);
+        auto imageR = stbi_load(imgR.c_str(), &width, &height, &channel, 4);
 
         //std::cout<<imageR<<std::endl;
 //        cv::Mat gray1_mat(400, 640, CV_8UC3, imageR);
@@ -85,6 +88,10 @@ int main(int argc, char **argv) {
         std::cout << "read images" << std::endl;
 
 //
+
+        MNN::CV::Matrix trans;
+        trans.setScale((float)(width-1) / (w-1), (float)(height-1) / (h-1));
+
         MNN::CV::ImageProcess::Config config;
         config.filterType = MNN::CV::BILINEAR;
 
@@ -95,20 +102,21 @@ int main(int argc, char **argv) {
         ::memcpy(config.normal, normals, sizeof(mean));
 
         std::shared_ptr<MNN::CV::ImageProcess> pretreat(MNN::CV::ImageProcess::create(config));
+        pretreat->setMatrix(trans);
 
-
-        pretreat->convert((uint8_t *) imageL, 640, 400, 0, inputLeft->writeMap<float>(), 640, 400,
+        pretreat->convert((uint8_t *) imageL, width, height, 0, inputLeft->writeMap<float>() + 0 * 4 * w * h , w, h,
                           4, 0, halide_type_of<float>());
 
-//        pretreat->convert((uint8_t *) imageR, 640, 400, 0, inputRight->writeMap<float>() + 1 * 4 * 400 * 640 , 640, 400,
+//        pretreat->convert((uint8_t *) imageR, 640, 400, 0, inputRight->writeMap<float>() + 10 * 4 * 400 * 640 , 640, 400,
 //                         4, 0, halide_type_of<float>());
 
         std::cout << "forward" << std::endl;
+//
+//        MNN::Express::Executor::getGlobalExecutor()->resetProfile();
 
-        MNN::Express::Executor::getGlobalExecutor()->resetProfile();
         auto outputs = module->onForward({inputLeft, inputLeft});
-        MNN::Express::Executor::getGlobalExecutor()->dumpProfile();
-        std::cout << "success" << std::endl;
+//        MNN::Express::Executor::getGlobalExecutor()->dumpProfile();
+//        std::cout << "success" << std::endl;
 
     }
     return 0;
